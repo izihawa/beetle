@@ -496,10 +496,7 @@ impl<S: Store> NetworkBehaviour for Bitswap<S> {
                     }
                 }
             }
-            HandlerEvent::Message {
-                mut message,
-                protocol,
-            } => {
+            HandlerEvent::Message { message, protocol } => {
                 self.set_peer_state(&peer_id, PeerState::Responsive(connection, protocol));
                 self.receive_message(peer_id, message);
             }

@@ -49,9 +49,9 @@ fn default_options() -> (Options, Cache) {
     opts.optimize_for_point_lookup(64 * 1024 * 1024);
     let par = (available_parallelism().map(|s| s.get()).unwrap_or(2) / 4).min(2);
     opts.increase_parallelism(par as _);
-    opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
-    opts.set_bottommost_compression_type(rocksdb::DBCompressionType::Zstd);
-    opts.set_blob_compression_type(rocksdb::DBCompressionType::Lz4);
+    opts.set_compression_type(rocksdb::DBCompressionType::None);
+    opts.set_bottommost_compression_type(rocksdb::DBCompressionType::None);
+    opts.set_blob_compression_type(rocksdb::DBCompressionType::None);
     opts.set_bytes_per_sync(1_048_576);
     opts.set_blob_file_size(512 * 1024 * 1024);
 

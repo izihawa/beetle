@@ -8,6 +8,7 @@ use std::{
 use anyhow::{ensure, Context, Result};
 use async_recursion::async_recursion;
 use bytes::Bytes;
+use cid::Cid;
 use futures::{
     stream::{self, BoxStream},
     Stream, StreamExt, TryFutureExt,
@@ -51,6 +52,7 @@ pub enum Directory {
 pub struct BasicDirectory {
     name: String,
     entries: Vec<Entry>,
+    extra_links: Vec<(String, Cid)>,
 }
 
 /// A hamt sharded directory
@@ -66,7 +68,7 @@ impl Directory {
     }
 
     pub fn basic(name: String, entries: Vec<Entry>) -> Self {
-        Directory::Basic(BasicDirectory { name, entries })
+        Directory::Basic(BasicDirectory { name, entries, extra_links: vec![] })
     }
 
     pub fn name(&self) -> &str {
@@ -135,6 +137,13 @@ impl BasicDirectory {
                     hash: Some(root_block.cid().to_bytes()),
                     name: Some(name),
                     tsize: Some(size),
+                });
+            }
+            for extra_link in self.extra_links {
+                links.push(dag_pb::PbLink {
+                    hash: Some(extra_link.1.to_bytes()),
+                    name: Some(extra_link.0),
+                    tsize: None,
                 });
             }
 
@@ -523,6 +532,7 @@ pub struct DirectoryBuilder {
     typ: DirectoryType,
     chunker: Chunker,
     degree: usize,
+    extra_links: Vec<(String, Cid)>,
 }
 
 impl Default for DirectoryBuilder {
@@ -533,6 +543,7 @@ impl Default for DirectoryBuilder {
             typ: DirectoryType::Basic,
             chunker: Chunker::Fixed(chunker::Fixed::default()),
             degree: DEFAULT_DEGREE,
+            extra_links: vec![],
         }
     }
 }
@@ -574,6 +585,11 @@ impl DirectoryBuilder {
         self.add_entry(Entry::RawBlock(raw_block))
     }
 
+    pub fn add_link(mut self, name: &str, cid: Cid) -> Self {
+        self.extra_links.push((name.to_string(), cid));
+        self
+    }
+
     pub fn add_symlink(self, symlink: Symlink) -> Self {
         self.add_entry(Entry::Symlink(symlink))
     }
@@ -605,12 +621,20 @@ impl DirectoryBuilder {
 
     pub fn build(self) -> Result<Directory> {
         let DirectoryBuilder {
-            name, entries, typ, ..
+            name,
+            entries,
+            typ,
+            extra_links,
+            ..
         } = self;
 
         let name = name.unwrap_or_default();
         Ok(match typ {
-            DirectoryType::Basic => Directory::Basic(BasicDirectory { name, entries }),
+            DirectoryType::Basic => Directory::Basic(BasicDirectory {
+                name,
+                entries,
+                extra_links,
+            }),
             DirectoryType::Hamt => {
                 let hamt = HamtNode::new(entries)
                     .context("unable to build hamt. Probably a hash collision.")?;
